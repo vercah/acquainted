@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Choose folder &middot; Acquainted{% endblock %}
+
+{% block content %}
+<h1>Folders</h1>
+
+{% if locations %}
+<ul class="locations">
+    {% for loc in locations %}
+    <li class="location-card">
+        <a class="location-link" href="{{ url_for('list_view', loc_id=loc.id) }}">
+            <strong>{{ loc.name }}</strong>
+            <span class="path">{{ loc.path }}</span>
+        </a>
+        <form method="post"
+              action="{{ url_for('delete_location', loc_id=loc.id) }}"
+              onsubmit="return confirm('Remove this folder from the list? Files on disk will remain.');">
+            <button type="submit" class="btn-link danger">remove</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="muted">No folders yet. Add one below.</p>
+{% endif %}
+
+<h2>Add folder</h2>
+<form method="post" action="{{ url_for('add_location') }}" class="add-location">
+    <label>
+        Name
+        <input name="name" type="text" required placeholder="Friends">
+    </label>
+    <label>
+        Path on disk
+        <span class="path-input-row">
+            <input id="path-input" name="path" type="text" required
+                   placeholder="C:\Users\Me\Documents\acquainted">
+            <button type="button" id="choose-folder-btn" class="btn">Choose</button>
+        </span>
+    </label>
+    <button type="submit">Add</button>
+</form>
+
+<script>
+(function () {
+    const btn = document.getElementById('choose-folder-btn');
+    const input = document.getElementById('path-input');
+    if (!btn || !input) return;
+
+    btn.addEventListener('click', async function () {
+        btn.disabled = true;
+        const originalLabel = btn.textContent;
+        btn.textContent = 'Choosing…';
+        try {
+            const resp = await fetch("{{ url_for('pick_folder') }}", { method: 'POST' });
+            if (!resp.ok) {
+                alert('Could not open folder picker.');
+                return;
+            }
+            const data = await resp.json();
+            if (data.path) {
+                input.value = data.path;
+                input.focus();
+            }
+        } catch (e) {
+            alert('Could not open folder picker: ' + e);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+        }
+    });
+})();
+</script>
+{% endblock %}

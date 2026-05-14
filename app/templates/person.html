@@ -1,0 +1,552 @@
+{% extends "base.html" %}
+{% block title %}{{ header['display-name'] }} &middot; {{ loc.name }}{% endblock %}
+
+{% block topbar_right %}
+<a class="btn" href="{{ url_for('list_view', loc_id=loc.id) }}">← Back to list</a>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ header['display-name'] or filename }}</h1>
+    {% if edit_mode %}
+    <a class="btn cancel-link" href="{{ url_for('person_view', loc_id=loc.id, filename=filename) }}">Cancel</a>
+    {% else %}
+    <a class="btn primary" href="{{ url_for('person_view', loc_id=loc.id, filename=filename, edit=1) }}">Add info</a>
+    {% endif %}
+</div>
+<p class="path muted">{{ filename }}{% if header['last-met'] %} &middot; last note: {{ header['last-met'] }}{% endif %}</p>
+
+{% if edit_mode %}
+<form method="post" class="person-form">
+    <fieldset>
+        <legend>Current info</legend>
+        <label>
+            Name
+            <input name="display-name" type="text" required
+                   value="{{ header['display-name'] }}">
+        </label>
+        <div class="partner-field">
+            <label>
+                Partners (comma-separated)
+                <span class="partner-input-row">
+                    <input id="partner-input" name="partner" type="text" value="{{ header['partner']|join(', ') }}">
+                    <input type="hidden" id="partner-file" name="partner-file" value="{{ header['partner-file']|join(', ') }}">
+                    <button type="button" class="btn" id="partner-choose-btn">+ Add</button>
+                </span>
+            </label>
+            <small class="muted">
+                Picked partners get a two-way link.
+                Removing one cascades to the other person's file.
+            </small>
+            <div class="partner-picker" id="partner-picker" hidden>
+                <input type="search" id="partner-picker-search" class="partner-picker-search" placeholder="Search…">
+                <ul class="partner-picker-list" id="partner-picker-list">
+                    {% for p in existing_people %}
+                    <li data-name="{{ p.display_name }}" data-filename="{{ p.filename }}">{{ p.display_name }}</li>
+                    {% else %}
+                    <li class="partner-picker-empty muted">No other people in this folder yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <label>
+            Job
+            <input name="job" type="text" value="{{ header['job'] }}">
+        </label>
+        <label>
+            Location
+            <input name="location" type="text" value="{{ header['location'] }}">
+        </label>
+        <label>
+            Tags (comma-separated)
+            <input id="tags-input" name="tags" type="text" value="{{ header['tags']|join(', ') }}">
+        </label>
+        {% if all_tags %}
+        <div class="tag-suggestions">
+            <small class="muted">Existing tags:</small>
+            {% for t in all_tags %}
+            <button type="button" class="tag-suggestion" data-tag="{{ t }}">{{ t }}</button>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </fieldset>
+
+    <fieldset>
+        <legend>New note</legend>
+        <div class="note-meta-row">
+            <label>
+                Date
+                <input type="date" name="note-date" value="{{ today }}">
+            </label>
+            <label class="note-type-label">
+                Type (optional)
+                <input type="text" name="note-type" placeholder="e.g. call, lunch, message">
+            </label>
+        </div>
+        <p class="form-help muted">
+            Changes to the info above are also auto-logged to this date.
+            Type <kbd>@</kbd> to mention an existing person.
+        </p>
+        <div class="mention-host">
+            <textarea name="note" rows="9" class="mention-enabled"
+                      placeholder="What's new? Each line = one bullet. Press Tab to indent for nested bullets (Shift+Tab to dedent)."></textarea>
+        </div>
+    </fieldset>
+
+    <div class="form-actions">
+        <button type="submit" class="btn primary">Save</button>
+        <a class="btn cancel-link" href="{{ url_for('person_view', loc_id=loc.id, filename=filename) }}">Cancel</a>
+    </div>
+</form>
+{% else %}
+{% set has_info = partner_links or header['job'] or header['location'] or header['tags'] %}
+{% if has_info %}
+<dl class="briefing">
+    {% if partner_links %}
+    <div class="briefing-row">
+        <dt>{% if partner_links|length > 1 %}Partners{% else %}Partner{% endif %}</dt>
+        <dd>
+            {% for link in partner_links %}
+                {% if link.filename %}
+                <a href="{{ url_for('person_view', loc_id=loc.id, filename=link.filename) }}">{{ link.name }}</a>
+                {% else %}
+                {{ link.name }}
+                {% endif %}
+                {%- if not loop.last %}, {% endif %}
+            {% endfor %}
+        </dd>
+    </div>
+    {% endif %}
+    {% if header['job'] %}
+    <div class="briefing-row">
+        <dt>Job</dt>
+        <dd>{{ header['job'] }}</dd>
+    </div>
+    {% endif %}
+    {% if header['location'] %}
+    <div class="briefing-row">
+        <dt>Location</dt>
+        <dd>{{ header['location'] }}</dd>
+    </div>
+    {% endif %}
+    {% if header['tags'] %}
+    <div class="briefing-row">
+        <dt>Tags</dt>
+        <dd>{% for t in header['tags'] %}<span class="tag">{{ t }}</span>{% endfor %}</dd>
+    </div>
+    {% endif %}
+</dl>
+{% else %}
+<p class="muted">No info filled in yet. <a href="{{ url_for('person_view', loc_id=loc.id, filename=filename, edit=1) }}">Add some</a>.</p>
+{% endif %}
+{% endif %}
+
+<section class="timeline">
+    <h2>History</h2>
+    {% if preamble_html %}
+    <div class="markdown-body timeline-preamble">{{ preamble_html|safe }}</div>
+    {% endif %}
+    {% if sections %}
+    <div class="timeline-sections">
+        {% for s in sections %}
+        <article class="timeline-section" data-section-index="{{ s.index }}">
+            <header class="timeline-section-head">
+                <h3 class="timeline-section-title">
+                    {{ s.date }}{% if s.type %}<span class="timeline-section-type">, {{ s.type }}</span>{% endif %}
+                </h3>
+                <button type="button" class="btn btn-link timeline-section-edit" data-target="{{ s.index }}">Edit</button>
+            </header>
+            <div class="markdown-body timeline-section-body" data-section-view="{{ s.index }}">
+                {% if s.content_html %}{{ s.content_html|safe }}{% else %}<p class="muted">(empty)</p>{% endif %}
+            </div>
+            <form method="post" action="{{ url_for('edit_section', loc_id=loc.id, filename=filename) }}"
+                  class="timeline-section-form" data-section-form="{{ s.index }}" hidden>
+                <input type="hidden" name="section-index" value="{{ s.index }}">
+                <div class="note-meta-row">
+                    <label>
+                        Date
+                        <input type="date" name="section-date" value="{{ s.date }}" required>
+                    </label>
+                    <label class="note-type-label">
+                        Type (optional)
+                        <input type="text" name="section-type" value="{{ s.type }}" placeholder="e.g. call, lunch">
+                    </label>
+                </div>
+                <div class="mention-host">
+                    <textarea name="section-content" rows="6" class="mention-enabled">{{ s.content }}</textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" name="action" value="save" class="btn primary">Save</button>
+                    <button type="button" class="btn timeline-section-cancel" data-target="{{ s.index }}">Cancel</button>
+                    <button type="submit" name="action" value="delete" class="btn timeline-section-delete"
+                            onclick="return confirm('Delete this note? This cannot be undone.');">Delete</button>
+                </div>
+            </form>
+        </article>
+        {% endfor %}
+    </div>
+    {% elif not preamble_html %}
+    <p class="muted">No records yet.{% if not edit_mode %} <a href="{{ url_for('person_view', loc_id=loc.id, filename=filename, edit=1) }}">Add the first note</a>.{% else %} Add the first note above.{% endif %}</p>
+    {% endif %}
+</section>
+
+<script>
+(function () {
+    document.querySelectorAll('.timeline-section').forEach(function (section) {
+        const idx = section.dataset.sectionIndex;
+        const view = section.querySelector('[data-section-view="' + idx + '"]');
+        const form = section.querySelector('[data-section-form="' + idx + '"]');
+        const head = section.querySelector('.timeline-section-head');
+        const editBtn = section.querySelector('.timeline-section-edit');
+        const cancelBtn = section.querySelector('.timeline-section-cancel');
+        if (!view || !form || !editBtn) return;
+
+        editBtn.addEventListener('click', function () {
+            view.hidden = true;
+            form.hidden = false;
+            editBtn.hidden = true;
+            const ta = form.querySelector('textarea');
+            if (ta) ta.focus();
+        });
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                view.hidden = false;
+                form.hidden = true;
+                editBtn.hidden = false;
+            });
+        }
+    });
+})();
+</script>
+
+<script type="application/json" id="acq-people-data">
+[{% for p in existing_people %}{"name": {{ p.display_name|tojson }}, "filename": {{ p.filename|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]
+</script>
+
+<script>
+// Reusable @-mention autocomplete. Attaches to any textarea with class
+// `mention-enabled`. Inserts `[@Name](filename.md)` on selection — that
+// renders as a relative link which the browser resolves against the current
+// /folder/<loc>/<file>.md URL, giving click-through to the mentioned person.
+window.acqAttachMentions = function (ta) {
+    if (!ta || ta.dataset.mentionsAttached) return;
+    ta.dataset.mentionsAttached = '1';
+
+    const peopleEl = document.getElementById('acq-people-data');
+    if (!peopleEl) return;
+    let people;
+    try { people = JSON.parse(peopleEl.textContent); } catch (e) { return; }
+    if (!people.length) return;
+
+    const host = ta.closest('.mention-host') || ta.parentElement;
+    if (host && getComputedStyle(host).position === 'static') {
+        host.style.position = 'relative';
+    }
+    const dropdown = document.createElement('ul');
+    dropdown.className = 'mention-dropdown';
+    dropdown.hidden = true;
+    host.appendChild(dropdown);
+
+    let activeQuery = null;     // {start, end}  — range of `@xxx` being completed
+    let highlighted = 0;
+
+    function close() {
+        dropdown.hidden = true;
+        activeQuery = null;
+    }
+
+    function findTrigger() {
+        const pos = ta.selectionStart;
+        if (pos !== ta.selectionEnd) return null;
+        const value = ta.value;
+        // Walk back from cursor until we hit @, whitespace, or start.
+        let i = pos - 1;
+        while (i >= 0) {
+            const ch = value[i];
+            if (ch === '@') {
+                // @ must be at start of textarea or preceded by whitespace/punct.
+                if (i === 0 || /[\s([{,;:]/.test(value[i - 1])) {
+                    return { start: i, end: pos, query: value.slice(i + 1, pos) };
+                }
+                return null;
+            }
+            // Stop on whitespace, newline, or anything that ends a "word".
+            if (/[\s\n\r]/.test(ch)) return null;
+            // Allow letters, digits, hyphens, apostrophes, dots in queries.
+            if (!/[\p{L}\p{N}\-'.]/u.test(ch)) return null;
+            i--;
+        }
+        return null;
+    }
+
+    function render(matches) {
+        dropdown.innerHTML = '';
+        matches.forEach(function (p, idx) {
+            const li = document.createElement('li');
+            li.className = 'mention-option' + (idx === highlighted ? ' active' : '');
+            li.textContent = p.name;
+            li.dataset.name = p.name;
+            li.dataset.filename = p.filename;
+            li.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                pick(p);
+            });
+            dropdown.appendChild(li);
+        });
+    }
+
+    function update() {
+        const trig = findTrigger();
+        if (!trig) { close(); return; }
+        const q = trig.query.toLowerCase();
+        const matches = people
+            .filter(p => !q || p.name.toLowerCase().includes(q))
+            .slice(0, 8);
+        if (!matches.length) { close(); return; }
+        activeQuery = trig;
+        highlighted = 0;
+        render(matches);
+        dropdown.hidden = false;
+    }
+
+    function pick(person) {
+        if (!activeQuery) return;
+        const before = ta.value.slice(0, activeQuery.start);
+        const after = ta.value.slice(activeQuery.end);
+        const firstName = (person.name.split(/\s+/)[0] || person.name).trim();
+        const insert = '[' + firstName + '](' + person.filename + ')';
+        ta.value = before + insert + after;
+        const newPos = before.length + insert.length;
+        ta.selectionStart = ta.selectionEnd = newPos;
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        close();
+        ta.focus();
+    }
+
+    ta.addEventListener('input', update);
+    ta.addEventListener('click', update);
+    ta.addEventListener('keyup', function (e) {
+        // Only re-check on arrow keys (cursor moved without input).
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+            e.key === 'Home' || e.key === 'End') update();
+    });
+    ta.addEventListener('keydown', function (e) {
+        if (dropdown.hidden) return;
+        const opts = dropdown.querySelectorAll('.mention-option');
+        if (!opts.length) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            highlighted = (highlighted + 1) % opts.length;
+            opts.forEach((el, i) => el.classList.toggle('active', i === highlighted));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            highlighted = (highlighted - 1 + opts.length) % opts.length;
+            opts.forEach((el, i) => el.classList.toggle('active', i === highlighted));
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            const el = opts[highlighted];
+            pick({ name: el.dataset.name, filename: el.dataset.filename });
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+        }
+    });
+    ta.addEventListener('blur', function () {
+        // Delay so click on dropdown registers first.
+        setTimeout(close, 150);
+    });
+};
+
+document.querySelectorAll('textarea.mention-enabled').forEach(function (ta) {
+    window.acqAttachMentions(ta);
+});
+</script>
+
+{% if edit_mode %}
+<script>
+(function () {
+    const btn = document.getElementById('partner-choose-btn');
+    const input = document.getElementById('partner-input');
+    const fileInput = document.getElementById('partner-file');
+    const picker = document.getElementById('partner-picker');
+    const search = document.getElementById('partner-picker-search');
+    const list = document.getElementById('partner-picker-list');
+    if (!btn || !input || !picker || !list) return;
+
+    function splitCsv(v) {
+        return (v || '').split(',').map(s => s.trim()).filter(Boolean);
+    }
+    function joinCsv(arr) {
+        return arr.join(', ');
+    }
+
+    btn.addEventListener('click', function () {
+        picker.hidden = !picker.hidden;
+        if (!picker.hidden && search) {
+            search.value = '';
+            for (const li of list.children) li.hidden = false;
+            search.focus();
+        }
+    });
+
+    if (search) {
+        search.addEventListener('input', function () {
+            const q = search.value.trim().toLowerCase();
+            for (const li of list.children) {
+                if (li.classList.contains('partner-picker-empty')) continue;
+                const name = (li.dataset.name || '').toLowerCase();
+                li.hidden = q && !name.includes(q);
+            }
+        });
+    }
+
+    list.addEventListener('click', function (e) {
+        const li = e.target.closest('li[data-name]');
+        if (!li) return;
+        const pickedName = li.dataset.name;
+        const pickedFile = li.dataset.filename || '';
+        const names = splitCsv(input.value);
+        const files = splitCsv(fileInput ? fileInput.value : '');
+        // Dedupe by filename if linked, otherwise by case-insensitive name.
+        const alreadyLinked = pickedFile && files.includes(pickedFile);
+        const alreadyTyped = names.some(n => n.toLowerCase() === pickedName.toLowerCase());
+        if (!alreadyLinked && !alreadyTyped) {
+            names.push(pickedName);
+            if (pickedFile && fileInput) files.push(pickedFile);
+        } else if (!alreadyLinked && pickedFile && fileInput) {
+            // Already typed but not linked — attach the file ref.
+            files.push(pickedFile);
+        }
+        input.value = joinCsv(names);
+        if (fileInput) fileInput.value = joinCsv(files);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        picker.hidden = true;
+        input.focus();
+    });
+
+    document.addEventListener('click', function (e) {
+        if (picker.hidden) return;
+        if (e.target === btn || btn.contains(e.target)) return;
+        if (picker.contains(e.target)) return;
+        picker.hidden = true;
+    });
+
+    // Cascade-removal confirmation: snapshot the linked partner-files at page
+    // load; on submit, warn if any have been removed.
+    const initialFiles = new Set(splitCsv(fileInput ? fileInput.value : ''));
+    const form = input.closest('form');
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            const currentFiles = new Set(splitCsv(fileInput ? fileInput.value : ''));
+            const removed = [];
+            initialFiles.forEach(f => { if (!currentFiles.has(f)) removed.push(f); });
+            if (removed.length === 0) return;
+            const msg = removed.length === 1
+                ? 'Removing 1 linked partner will also remove the link from their page. Continue?'
+                : 'Removing ' + removed.length + ' linked partners will also remove the links from their pages. Continue?';
+            if (!window.confirm(msg)) {
+                e.preventDefault();
+            }
+        });
+    }
+})();
+
+// Click an existing-tag chip to append it to the tags input (deduped).
+(function () {
+    const input = document.getElementById('tags-input');
+    if (!input) return;
+    document.querySelectorAll('.tag-suggestion').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const tag = btn.dataset.tag;
+            if (!tag) return;
+            const current = input.value.split(',').map(t => t.trim()).filter(Boolean);
+            if (current.some(t => t.toLowerCase() === tag.toLowerCase())) return;
+            current.push(tag);
+            input.value = current.join(', ');
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.focus();
+        });
+    });
+})();
+
+// Tab / Shift+Tab: indent / dedent in the note textarea (4-space units, which
+// is what Python-Markdown treats as a nested list level).
+(function () {
+    const ta = document.querySelector('textarea[name="note"]');
+    if (!ta) return;
+    const INDENT = '    ';
+
+    ta.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab') return;
+        e.preventDefault();
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const value = ta.value;
+
+        if (start === end) {
+            if (e.shiftKey) {
+                const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+                const head = value.slice(lineStart, start);
+                let drop = 0;
+                if (head.startsWith(INDENT)) drop = INDENT.length;
+                else if (head.startsWith('\t')) drop = 1;
+                else {
+                    const m = head.match(/^ {1,3}/);
+                    if (m) drop = m[0].length;
+                }
+                if (!drop) return;
+                ta.value = value.slice(0, lineStart) + head.slice(drop) + value.slice(start);
+                ta.selectionStart = ta.selectionEnd = start - drop;
+            } else {
+                ta.value = value.slice(0, start) + INDENT + value.slice(end);
+                ta.selectionStart = ta.selectionEnd = start + INDENT.length;
+            }
+        } else {
+            const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+            const before = value.slice(0, lineStart);
+            const block = value.slice(lineStart, end);
+            const after = value.slice(end);
+            const lines = block.split('\n');
+            let newBlock;
+            if (e.shiftKey) {
+                newBlock = lines.map(l => {
+                    if (l.startsWith(INDENT)) return l.slice(INDENT.length);
+                    if (l.startsWith('\t')) return l.slice(1);
+                    const m = l.match(/^ {1,3}/);
+                    return m ? l.slice(m[0].length) : l;
+                }).join('\n');
+            } else {
+                newBlock = lines.map(l => INDENT + l).join('\n');
+            }
+            ta.value = before + newBlock + after;
+            ta.selectionStart = lineStart;
+            ta.selectionEnd = lineStart + newBlock.length;
+        }
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+})();
+
+// Warn before leaving with unsaved changes.
+(function () {
+    const form = document.querySelector('.person-form');
+    if (!form) return;
+
+    let dirty = false;
+    let bypass = false;
+
+    form.addEventListener('input', function () { dirty = true; });
+    form.addEventListener('submit', function () { bypass = true; });
+    document.querySelectorAll('.cancel-link').forEach(function (el) {
+        el.addEventListener('click', function () { bypass = true; });
+    });
+
+    window.addEventListener('beforeunload', function (e) {
+        if (dirty && !bypass) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

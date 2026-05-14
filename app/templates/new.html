@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}New person &middot; {{ loc.name }}{% endblock %}
+
+{% block topbar_right %}
+<a class="btn" href="{{ url_for('list_view', loc_id=loc.id) }}">← Back to list</a>
+{% endblock %}
+
+{% block content %}
+<h1>New person</h1>
+
+<form method="post" class="person-form">
+    <label>
+        Name (display name) *
+        <input name="display-name" type="text" required
+               value="{{ header['display-name'] }}" autofocus>
+    </label>
+    <label>
+        File
+        <span class="filename-input-row">
+            <input id="filename-input" name="filename" type="text"
+                   value="{{ suggested_filename }}"
+                   placeholder="auto-generated from name">
+            <span class="filename-suffix">.md</span>
+        </span>
+        <small class="muted">
+            If left empty, will be saved as
+            <code id="filename-preview" class="filename-preview">person.md</code>.
+        </small>
+    </label>
+    <div class="partner-field">
+        <label>
+            Partners (comma-separated)
+            <span class="partner-input-row">
+                <input id="partner-input" name="partner" type="text"
+                       value="{{ header['partner']|join(', ') }}">
+                <input type="hidden" id="partner-file" name="partner-file"
+                       value="{{ header['partner-file']|join(', ') }}">
+                <button type="button" class="btn" id="partner-choose-btn">+ Add</button>
+            </span>
+        </label>
+        <small class="muted">
+            Picked partners get a two-way link.
+        </small>
+        <div class="partner-picker" id="partner-picker" hidden>
+            <input type="search" id="partner-picker-search" class="partner-picker-search" placeholder="Search…">
+            <ul class="partner-picker-list" id="partner-picker-list">
+                {% for p in existing_people %}
+                <li data-name="{{ p.display_name }}" data-filename="{{ p.filename }}">{{ p.display_name }}</li>
+                {% else %}
+                <li class="partner-picker-empty muted">No people in this folder yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <label>
+        Job
+        <input name="job" type="text" value="{{ header['job'] }}">
+    </label>
+    <label>
+        Location
+        <input name="location" type="text" value="{{ header['location'] }}">
+    </label>
+    <label>
+        Tags (comma-separated)
+        <input id="tags-input" name="tags" type="text" value="{{ header['tags']|join(', ') }}">
+    </label>
+    {% if all_tags %}
+    <div class="tag-suggestions">
+        <small class="muted">Existing tags:</small>
+        {% for t in all_tags %}
+        <button type="button" class="tag-suggestion" data-tag="{{ t }}">{{ t }}</button>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <div class="form-actions">
+        <button type="submit" class="btn primary">Create</button>
+        <a class="btn" href="{{ url_for('list_view', loc_id=loc.id) }}">Cancel</a>
+    </div>
+</form>
+
+<script>
+// Mirror storage.slugify_filename so the user sees exactly what gets saved.
+(function () {
+    const nameInput = document.querySelector('input[name="display-name"]');
+    const fileInput = document.getElementById('filename-input');
+    const preview = document.getElementById('filename-preview');
+    if (!nameInput || !fileInput || !preview) return;
+
+    function slugify(displayName) {
+        let name = (displayName || '').replace(/\([^)]*\)/g, '').trim();
+        // NFKD + strip combining diacritics — same as Python's unicodedata.
+        name = name.normalize('NFKD').replace(/[̀-ͯ]/g, '');
+        const parts = name.split(/\s+/)
+            .map(p => p.replace(/[^a-zA-Z0-9]+/g, '').toLowerCase())
+            .filter(Boolean);
+        if (parts.length === 0) return 'person.md';
+        if (parts.length === 1) return parts[0] + '.md';
+        const surname = parts[parts.length - 1];
+        const given = parts.slice(0, -1).join('-');
+        return surname + '-' + given + '.md';
+    }
+
+    function update() {
+        const slug = slugify(nameInput.value);
+        preview.textContent = slug;
+        // Surface the same slug as placeholder in the filename input
+        // (without the .md, since the suffix chip already shows it).
+        fileInput.placeholder = slug.replace(/\.md$/, '');
+    }
+
+    nameInput.addEventListener('input', update);
+    update();
+})();
+
+(function () {
+    const btn = document.getElementById('partner-choose-btn');
+    const input = document.getElementById('partner-input');
+    const fileInput = document.getElementById('partner-file');
+    const picker = document.getElementById('partner-picker');
+    const search = document.getElementById('partner-picker-search');
+    const list = document.getElementById('partner-picker-list');
+    if (!btn || !input || !picker || !list) return;
+
+    function splitCsv(v) { return (v || '').split(',').map(s => s.trim()).filter(Boolean); }
+    function joinCsv(arr) { return arr.join(', '); }
+
+    btn.addEventListener('click', function () {
+        picker.hidden = !picker.hidden;
+        if (!picker.hidden && search) {
+            search.value = '';
+            for (const li of list.children) li.hidden = false;
+            search.focus();
+        }
+    });
+
+    if (search) {
+        search.addEventListener('input', function () {
+            const q = search.value.trim().toLowerCase();
+            for (const li of list.children) {
+                if (li.classList.contains('partner-picker-empty')) continue;
+                const name = (li.dataset.name || '').toLowerCase();
+                li.hidden = q && !name.includes(q);
+            }
+        });
+    }
+
+    list.addEventListener('click', function (e) {
+        const li = e.target.closest('li[data-name]');
+        if (!li) return;
+        const pickedName = li.dataset.name;
+        const pickedFile = li.dataset.filename || '';
+        const names = splitCsv(input.value);
+        const files = splitCsv(fileInput ? fileInput.value : '');
+        const alreadyLinked = pickedFile && files.includes(pickedFile);
+        const alreadyTyped = names.some(n => n.toLowerCase() === pickedName.toLowerCase());
+        if (!alreadyLinked && !alreadyTyped) {
+            names.push(pickedName);
+            if (pickedFile && fileInput) files.push(pickedFile);
+        } else if (!alreadyLinked && pickedFile && fileInput) {
+            files.push(pickedFile);
+        }
+        input.value = joinCsv(names);
+        if (fileInput) fileInput.value = joinCsv(files);
+        picker.hidden = true;
+        input.focus();
+    });
+
+    document.addEventListener('click', function (e) {
+        if (picker.hidden) return;
+        if (e.target === btn || btn.contains(e.target)) return;
+        if (picker.contains(e.target)) return;
+        picker.hidden = true;
+    });
+})();
+
+// Click an existing-tag chip to append it to the tags input (deduped).
+(function () {
+    const input = document.getElementById('tags-input');
+    if (!input) return;
+    document.querySelectorAll('.tag-suggestion').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const tag = btn.dataset.tag;
+            if (!tag) return;
+            const current = input.value.split(',').map(t => t.trim()).filter(Boolean);
+            if (current.some(t => t.toLowerCase() === tag.toLowerCase())) return;
+            current.push(tag);
+            input.value = current.join(', ');
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.focus();
+        });
+    });
+})();
+</script>
+{% endblock %}

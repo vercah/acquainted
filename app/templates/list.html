@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ loc.name }} &middot; Acquainted{% endblock %}
+
+{% block topbar_right %}
+<a class="btn primary" href="{{ url_for('new_person', loc_id=loc.id) }}">+ New person</a>
+{% endblock %}
+
+{% block content %}
+<h1>{{ loc.name }}</h1>
+<p class="path muted">{{ folder_path }}</p>
+
+<form method="get" class="list-toolbar" action="{{ url_for('list_view', loc_id=loc.id) }}">
+    <input id="search" name="q" type="search" value="{{ q }}"
+           placeholder="Search… (name, tag, or note text)" autofocus>
+    {% if is_search %}
+    <a class="btn" href="{{ url_for('list_view', loc_id=loc.id) }}">Clear</a>
+    {% else %}
+    <div class="sort-toggle">
+        <a class="{% if sort != 'last-met' %}active{% endif %}"
+           href="{{ url_for('list_view', loc_id=loc.id) }}">Alphabetically</a>
+        <a class="{% if sort == 'last-met' %}active{% endif %}"
+           href="{{ url_for('list_view', loc_id=loc.id, sort='last-met') }}">Recently</a>
+    </div>
+    {% endif %}
+</form>
+
+{% if is_search %}
+    {% if primary %}
+    <h3 class="search-section-title">Matches in name or tag</h3>
+    <ul class="people">
+        {% for p in primary %}
+        <li class="person-row">
+            <a href="{{ url_for('person_view', loc_id=loc.id, filename=p.filename) }}">
+                <span class="name">{{ p.display_name }}</span>
+                {% if p.tags %}
+                <span class="tags">
+                    {% for t in p.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+                </span>
+                {% endif %}
+                {% if p.last_met %}
+                <span class="last-met">{{ p.last_met }}</span>
+                {% else %}
+                <span class="last-met muted">—</span>
+                {% endif %}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if body_matches %}
+    <h3 class="search-section-title">Matches in notes</h3>
+    <ul class="people">
+        {% for p in body_matches %}
+        <li class="person-row body-match">
+            <a href="{{ url_for('person_view', loc_id=loc.id, filename=p.filename) }}">
+                <span class="name">{{ p.display_name }}</span>
+                {% if p.last_met %}
+                <span class="last-met">{{ p.last_met }}</span>
+                {% else %}
+                <span class="last-met muted">—</span>
+                {% endif %}
+            </a>
+            <div class="snippets">
+                {% for s in p.snippets %}
+                <p class="snippet">{{ s }}</p>
+                {% endfor %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if not primary and not body_matches %}
+    <p class="muted">Nothing matched “{{ q }}”.</p>
+    {% endif %}
+{% else %}
+    {% if people %}
+    <ul class="people">
+        {% for p in people %}
+        <li class="person-row">
+            <a href="{{ url_for('person_view', loc_id=loc.id, filename=p.filename) }}">
+                <span class="name">{{ p.display_name }}</span>
+                {% if p.tags %}
+                <span class="tags">
+                    {% for t in p.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+                </span>
+                {% endif %}
+                {% if p.last_met %}
+                <span class="last-met">{{ p.last_met }}</span>
+                {% else %}
+                <span class="last-met muted">—</span>
+                {% endif %}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">
+        No people yet. <a href="{{ url_for('new_person', loc_id=loc.id) }}">Add the first one</a>.
+    </p>
+    {% endif %}
+{% endif %}
+{% endblock %}
