@@ -173,7 +173,15 @@ def search_in_folder(folder: Path, query: str) -> dict:
             "tags": _normalize_tags(meta.get("tags")),
         }
 
-        if q in person["display_name"].lower() or any(q in t.lower() for t in person["tags"]):
+        haystacks = [
+            person["display_name"].lower(),
+            _normalize_str(meta.get("job")).lower(),
+            _normalize_str(meta.get("location")).lower(),
+        ]
+        haystacks.extend(t.lower() for t in person["tags"])
+        haystacks.extend(p.lower() for p in _normalize_partner_list(meta.get("partner")) if p)
+
+        if any(q in h for h in haystacks):
             primary.append(person)
             continue
 
