@@ -48,6 +48,7 @@ This is a personal-scale tool released as-is. The author provides no warranty an
 
 ### Running the app
 
+- Get the code: either `git clone https://github.com/vercah/acquainted.git` (if you have Git installed), or click the green **Code** button on the GitHub page → **Download ZIP**, then extract it somewhere convenient (e.g. `C:\Users\Me\acquainted`).
 - Double-click `run.bat`. First launch creates a `.venv` and installs deps (~30s); after that it starts instantly.
 - The browser opens to `http://127.0.0.1:5000/`.
 - Stop the server by clicking the red **Exit** button in the top bar (or just close the console window).
@@ -90,11 +91,10 @@ This is a personal-scale tool released as-is. The author provides no warranty an
 
 The Partners field accepts **multiple people**, comma-separated. Click **+ Add** to open the picker; each click appends a partner (you can also just type names directly).
 
-- **Picked partners are linked both ways.** When you save, the app silently adds you to that person's partner list too — no note bullet on either side.
+- **Picked partners are linked both ways.** When you save, the app silently adds you to that person's partner list too — your own page gets the usual `- partner: +Sam` auto-log bullet, but their page is updated without one.
 - **Removing a linked partner cascades.** If you remove someone you previously picked, they're removed from your file *and* their file. A confirmation popup warns you before the save goes through.
 - **Renaming yourself propagates.** Existing backlinks update to your new display name on next save.
 - **Typed-but-unpicked names** (people not in the folder) stay as plain text — no link, no backlink.
-- **Existing single-partner files don't need migration.** YAML stays as `partner: Sam` until you actually add a second partner, at which point it switches to a list. Files you've edited only in Obsidian still load fine.
 
 ### Searching
 
