@@ -1,19 +1,19 @@
 /* Acquainted — minimal, readable, Obsidian-ish */
 
 :root {
-    --bg: #eaf6eb;
+    --bg: #e6f5d9;
     --bg-card: #ffffff;
-    --bg-topbar: #d8e9da;
+    --bg-topbar: #d2e6bd;
     --fg: #222;
-    --muted: #7a8a7c;
-    --border: #cfe0d1;
-    --accent: #4b874d;
-    --accent-hover: #3a6b3c;
-    --accent-soft: #c8e2ca;
+    --muted: #7a8a6a;
+    --border: #c8dcb0;
+    --accent: #4f8e32;
+    --accent-hover: #3e7223;
+    --accent-soft: #c8e2ad;
     --danger: #b94a48;
-    --success: #2e6b2f;
+    --success: #387219;
     --info: #31708f;
-    --tag-bg: #d2e7d4;
+    --tag-bg: #d4e6b8;
 }
 
 * { box-sizing: border-box; }
@@ -552,7 +552,7 @@ button.tag-suggestion:hover {
     justify-content: space-between;
     padding: 0.55rem 1rem;
     border-bottom: 1px solid var(--border);
-    background: #f6fbf6;
+    background: #f1faeb;
 }
 .timeline-section-title {
     margin: 0;
