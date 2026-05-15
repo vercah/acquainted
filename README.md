@@ -6,6 +6,13 @@ The app's job is to make updating fast: open someone's page after meeting them, 
 
 *Built with assistance from [Claude Code](https://claude.com/claude-code).*
 
+## Contents
+
+- [Privacy and disclaimer](#privacy-and-disclaimer)
+- [Screenshots](#screenshots)
+- [For users](#for-users)
+- [For developers](#for-developers)
+
 ## Privacy and disclaimer
 
 The app is designed to run **only on `127.0.0.1`** (localhost) — don't expose your local `.md` files with sensitive information to your network or the internet. Keep the bind address as-is and don't open port 5000 in your firewall. Nothing is uploaded anywhere by the app itself.
