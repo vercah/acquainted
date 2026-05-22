@@ -1,5 +1,7 @@
 # Acquainted
 
+> *I care about the people in my life. My memory does not always cooperate.*
+
 A small local web app for keeping semi-structured notes about friends and colleagues. Each person is one Markdown file with YAML frontmatter (current facts) and a dated timeline of encounter notes (history). Files stay readable in any Markdown editor, e.g., Obsidian works nicely with this app.
 
 The app's job is to make updating fast: open someone's page after meeting them, change a field or jot a note, and the app auto-logs what changed under the date you pick.
