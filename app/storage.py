@@ -464,6 +464,24 @@ def _bullets_from_note(note: str) -> list[str]:
     return bullets
 
 
+def note_to_plain(content: str) -> str:
+    """Inverse of `_bullets_from_note` for display: strip the leading `- ` marker
+    from each line (preserving indentation) so the section editor shows the same
+    plain lines you'd type when creating a note, rather than raw markdown bullets.
+    """
+    out = []
+    for raw_line in content.split("\n"):
+        line = raw_line.rstrip()
+        leading = line[: len(line) - len(line.lstrip())]
+        stripped = line.lstrip()
+        if stripped.startswith("- "):
+            stripped = stripped[2:]
+        elif stripped.startswith("-") and len(stripped) > 1:
+            stripped = stripped[1:].lstrip()
+        out.append(leading + stripped)
+    return "\n".join(out)
+
+
 def _insert_into_date(
     body: str, bullets: list[str], entry_date: str, entry_type: str = ""
 ) -> str:
@@ -609,7 +627,10 @@ def update_section(
     if section_index < 0 or section_index >= len(sections):
         raise IndexError(f"section {section_index} out of range")
 
-    new_content_clean = new_content.rstrip()
+    # Normalise each line into a markdown bullet, matching note creation
+    # (`save_person` runs new notes through `_bullets_from_note`). This is
+    # idempotent for lines that already start with `- `.
+    new_content_clean = "\n".join(_bullets_from_note(new_content))
     if not new_content_clean.strip():
         sections.pop(section_index)
     else:

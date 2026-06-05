@@ -16,6 +16,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 
@@ -129,7 +130,14 @@ def pick_folder():
 def list_view(loc_id):
     folder = _resolve_folder(loc_id)
     loc = cfg.get_location(loc_id)
-    sort = request.args.get("sort", "name")
+    # Remember the chosen sort across navigation (e.g. returning from a person
+    # page, whose back-link doesn't carry the sort param). The toggle links set
+    # ?sort=…; absent that, fall back to the last remembered choice.
+    sort = request.args.get("sort")
+    if sort in ("name", "last-met"):
+        session["sort"] = sort
+    else:
+        sort = session.get("sort", "name")
     q = (request.args.get("q") or "").strip()
 
     if q:
@@ -264,6 +272,7 @@ def person_view(loc_id, filename):
             "date": s["date"],
             "type": s["type"],
             "content": s["content"],
+            "content_plain": storage.note_to_plain(s["content"]),
             "content_html": md.markdown(s["content"]) if s["content"].strip() else "",
         })
     all_people = storage.list_people(folder)
